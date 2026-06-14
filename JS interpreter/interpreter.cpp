@@ -1,6 +1,7 @@
 #include "interpreter.h"
 
 #include <stdexcept>
+#include <cmath>
 
 Interpreter::Interpreter(const std::vector<Node*> &nodeList) : nodes(nodeList) {
 
@@ -46,15 +47,7 @@ Value Interpreter::EvaluateExpression(Node* node) {
 				if (node->op == "-") return a - b;
 				if (node->op == "*") return a * b;
 				if (node->op == "/") return a / b;
-				if (node->op == "%") {
-					int ia = static_cast<int>(a);
-					int ib = static_cast<int>(b);
-
-					if (ib == 0)
-						throw std::runtime_error("Modulo by zero");
-
-					return ia % ib;
-				}
+				if (node->op == "%") return std::fmod(a, b);
 				if (node->op == ">") return a > b;
 				if (node->op == ">=") return a >= b;
 				if (node->op == "<") return a < b;
