@@ -112,19 +112,25 @@ Value Interpreter::EvaluateExpression(Node* node) {
 		return std::visit([&](auto&& a) -> Value {
 			using A = std::decay_t<decltype(a)>;
 			if constexpr (std::is_same_v<A, double>) {
-				if (node->op == "u+") return +a;
-				if (node->op == "u-") return -a;
-				if (node->op == "!") return a == 0;
+				switch (node->type) {
+					case TokenType::Plus: return +a;
+					case TokenType::Minus: return -a;
+					case TokenType::ExclamationMark: return a == 0;
+				}
 			}
 			else if constexpr (std::is_same_v<A, bool>) {
-				if (node->op == "u+") return +boolToDouble(a);
-				if (node->op == "u-") return -boolToDouble(a);
-				if (node->op == "!") return !a;
+				switch (node->type) {
+					case TokenType::Plus: return +boolToDouble(a);
+					case TokenType::Minus: return -boolToDouble(a);
+					case TokenType::ExclamationMark: return !a;
+				}
 			}
 			else if constexpr (std::is_same_v<A, std::string>) {
-				if (node->op == "u+") return +strToDouble(a);
-				if (node->op == "u-") return -strToDouble(a);
-				if (node->op == "!") return a != "";
+				switch (node->type) {
+					case TokenType::Plus: return +strToDouble(a);
+					case TokenType::Minus: return -strToDouble(a);
+					case TokenType::ExclamationMark: return a != "";
+				}
 			}
 			throw std::runtime_error("Unknown operator: " + node->op);
 		}, left);
@@ -151,7 +157,6 @@ Value Interpreter::EvaluateExpression(Node* node) {
 	    	if constexpr (std::is_same_v<A, double> && std::is_same_v<B, double>) {
 
 				switch (node->type) {
-
 					case TokenType::Plus: return a + b;
 					case TokenType::Minus: return a - b;
 					case TokenType::Star: return a * b;
