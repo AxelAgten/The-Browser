@@ -15,6 +15,8 @@ std::ostream& operator<<(std::ostream& os, TokenType t) {
     case TokenType::Star: return os << "Star";
     case TokenType::Slash: return os << "Slash";
     case TokenType::Percent: return os << "Percent";
+    case TokenType::ExclamationMark: return os << "ExclamationMark";
+    case TokenType::StarStar: return os << "StarStar";
     case TokenType::LeftParen: return os << "LeftParen";
     case TokenType::RightParen: return os << "RightParen";
     case TokenType::Equals: return os << "Equals";
@@ -67,12 +69,13 @@ std::vector<Token> Lexer::Tokenize() {
     std::string word = "";
     size_t line = 1;
     bool insString = false;
+    bool escaped = false;
     while (position != sourceCode.length()) {
         character = sourceCode[position];
 
         if (character == '\n') {
             if (insString) {
-                throw std::runtime_error("string not closed on line: " + line);
+                throw std::runtime_error(std::string("string not closed on line: ") + std::to_string(line));
             }
             if (!word.empty()) {
                 if (IsNumberWord(word)){
@@ -105,7 +108,7 @@ std::vector<Token> Lexer::Tokenize() {
             }
         }
 
-        bool valid = false;
+        /*bool valid = false;
         if (std::isdigit(character) || std::isalpha(character)) {
             valid = true;
         }
@@ -122,7 +125,7 @@ std::vector<Token> Lexer::Tokenize() {
 
         if (!valid) {
             throw std::runtime_error(std::string("Unknown character ") + character + std::string(" on line ") + std::to_string(line));
-        }
+        }*/
 
         if (character == '.' && word.find('.') != std::string::npos) {
             throw std::runtime_error(std::string("You cant have a decimal in a decimal on line") + std::to_string(line));
@@ -140,7 +143,7 @@ std::vector<Token> Lexer::Tokenize() {
                 FlushWord(tokens, word, line);
             }
         }
-        ParseCharacter(tokens, character, word, line, insString);
+        ParseCharacter(tokens, sourceCode, position, word, line, insString, escaped);
         position++;
     }
     if (!word.empty() && !insString) {
@@ -164,9 +167,41 @@ std::vector<Token> Lexer::Tokenize() {
     return tokens;
 }
 
-void Lexer::ParseCharacter(std::vector<Token> &tokens, const char character, std::string &word, size_t line, bool &inString) {
+void Lexer::ParseCharacter(std::vector<Token> &tokens, const std::string &input, size_t &index, std::string &word, size_t line, bool &inString, bool &escaped) {
+    char character = input[index];
     if (inString) {
-        if (character != '\"') {
+        if (character == '\\' && !escaped) {
+            escaped = true;
+            return;
+        }
+        if (character != '\"' || escaped) {
+            if (escaped) {
+                if (character == 'n') character = '\n';
+                else if (character == 'r') character = '\r';
+                else if (character == 't') character = '\t';
+                else if (character == 'b') character = '\b';
+                else if (character == 'f') character = '\f';
+                else if (character == 'v') character = '\v';
+                else if (character == '0') character = '\0';
+                else if (character == 'x') {
+                    if (input.size() - index - 2 < 0) throw std::runtime_error(std::string("SyntaxError: Invalid hexadecimal escape sequence on line: ") + std::to_string(line));
+                    std::string hex;
+                    hex += input[++index];
+                    hex += input[++index];
+                    if (!(IsHexChar(hex[0]) && IsHexChar(hex[1]))) throw std::runtime_error(std::string("SyntaxError: Invalid hexadecimal escape sequence on line: ") + std::to_string(line));
+                    character = (char) std::stoi(hex, nullptr, 16);
+                }
+                else if (character == 'u') {
+                    if (input.size() - index - 4 < 0) throw std::runtime_error(std::string("Invalid Unicode escape sequence on line: ") + std::to_string(line));
+                    std::string hex;
+                    for (int i = 0; i < 4; i++) {
+                        hex += input[++index];
+                        if (!IsHexChar(hex[i])) throw std::runtime_error(std::string("Invalid Unicode escape sequence on line: ") + std::to_string(line));
+                    }
+                    character = (char) std::stoi(hex, nullptr, 16);
+                }
+                escaped = false;
+            }
             word += character;
             return;
         }
@@ -207,6 +242,11 @@ void Lexer::ParseCharacter(std::vector<Token> &tokens, const char character, std
     if (character == '+') {
         token.type = TokenType::Plus;
     } else if (character == '*') {
+        if (index + 1 <= input.size() && input[index + 1] == '*') {
+            tokens.push_back({TokenType::StarStar, "**", line});
+            index++;
+            return;
+        }
         token.type = TokenType::Star;
     } else if (character == '-') {
         token.type = TokenType::Minus;
@@ -214,6 +254,8 @@ void Lexer::ParseCharacter(std::vector<Token> &tokens, const char character, std
         token.type = TokenType::Slash;
     } else if (character == '%') {
         token.type = TokenType::Percent;
+    } else if (character == '!') {
+        token.type = TokenType::ExclamationMark;
     } else if (character == '(') {
         token.type = TokenType::LeftParen;
     } else if (character == ')') {
@@ -237,6 +279,9 @@ void Lexer::ParseCharacter(std::vector<Token> &tokens, const char character, std
             return;
         }
         inString = !inString;
+    } else {
+        word += character;
+        return;
     }
 
     tokens.push_back(token);
@@ -319,5 +364,12 @@ bool Lexer::IsBoolChar(char character) {
             return true;
         }
     }
+    return false;
+}
+
+bool Lexer::IsHexChar(char character) {
+    if (character >= '0' && character <= '9') return true;
+    if (character >= 'A' && character <= 'Z') return true;
+    if (character >= 'a' && character <= 'z') return true;
     return false;
 }

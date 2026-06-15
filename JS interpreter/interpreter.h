@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <variant>
 
-using Value = std::variant<double, std::string, bool, char>;
+using Value = std::variant<double, std::string, bool>;
 
 class Interpreter {
 public:

@@ -5,7 +5,7 @@
 #include "interpreter.h"
 
 int main() {
-    Lexer lexer("C:/Users/Axela/Documents/Programming/JS/test.js");
+    Lexer lexer("test.js");
     std::vector<Token> tokens = lexer.Tokenize();
 
     Parser parser(tokens);

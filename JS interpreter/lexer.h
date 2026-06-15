@@ -13,6 +13,8 @@ enum class TokenType
     Star,
     Slash,
     Percent,
+    ExclamationMark,
+    StarStar,
     LeftParen,
     RightParen,
     Equals,
@@ -52,12 +54,13 @@ public:
     std::vector<Token> Tokenize();
 
 private:
-    void ParseCharacter(std::vector<Token> &tokens, char character, std::string &number, size_t line, bool &inString);
+    void ParseCharacter(std::vector<Token> &tokens, const std::string &input, size_t &index, std::string &word, size_t line, bool &inString, bool &escaped);
     void FlushNumber(std::vector<Token>& tokens, std::string& number, size_t line);
     void FlushWord(std::vector<Token>& tokens, std::string& word, size_t line);
     bool IsRaraCharacter(char character);
     bool IsNumberWord(const std::string& word);
     bool IsBoolChar(char character);
+    bool IsHexChar(char character);
 
     std::string validRaraChars = "+-*/%$_;()!\" ";
     std::string validBoolChars = "=&|<>!";

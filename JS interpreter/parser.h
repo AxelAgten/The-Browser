@@ -17,6 +17,11 @@ struct Node {
 	Node(std::string oper, TokenType itemType) { op = oper; left = nullptr; right = nullptr; type = itemType; };
 };
 
+struct Opperator {
+	std::string op;
+	TokenType type;
+};
+
 class Parser {
 public:
 	Parser(const std::vector<Token> &newTokens);
@@ -26,11 +31,11 @@ public:
 
 private:
 	bool IsOperator(std::string type);
-	void AddNode(std::string op, std::vector<Node*>& astOutput);
+	void AddNode(Opperator op, std::vector<Node*>& astOutput);
 	void DeleteNode(Node *node);
 	void PrintNode(Node *node);
 
-	std::map<std::string, int> operators = {{"let", -1},{"=", 0},{"||", 1}, {"&&", 2}, {"<", 3}, {"<=", 3},{">", 3}, {">=", 3}, {"==", 3}, {"!=", 3},{"+", 4}, {"-", 4}, {"*", 5}, {"/", 5}};
+	std::map<std::string, int> operators = {{"let", -1},{"=", 0},{"||", 1}, {"&&", 2}, {"<", 3}, {"<=", 3},{">", 3}, {">=", 3}, {"==", 3}, {"!=", 3},{"+", 4}, {"-", 4}, {"*", 5}, {"/", 5}, {"%", 5}, {"**", 6}, {"u+", 7}, {"u-", 7}, {"!", 7}};
 	std::vector<Token> tokens;
 	std::vector<Node*> output;
 };
