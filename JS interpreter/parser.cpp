@@ -68,8 +68,15 @@ std::vector<Node*>& Parser::ParseToAst() {
 
 			if (op == "+" || op == "-") {
 				if (expectingOperand) {
-					op = "u" + op; // e.g. u+ or u-
+					op = "u" + op; // u+ or u-
 				}
+			}
+
+			if ((op == "++" || op == "--") && astOutput.size() > 0 && astOutput.back()->type == TokenType::Identifier) {
+				Node* operand = astOutput.back();
+				astOutput.pop_back();
+				astOutput.push_back(new Node(op, nullptr, operand, token.type));
+				continue;
 			}
 
 			while (ops.size() > 0 && IsOperator(ops.back().op) && operators.at(ops.back().op) >= operators.at(op)) {
@@ -104,7 +111,7 @@ bool Parser::IsOperator(std::string type) {
 }
 
 void Parser::AddNode(Opperator op, std::vector<Node*> &astOutput) {
-	if (op.op == "u+" || op.op == "u-" || op.op == "!") {
+	if (op.op == "u+" || op.op == "u-" || op.op == "!" || op.op == "++" || op.op == "--") {
 		if (astOutput.size() < 1)
 			throw std::runtime_error("Invalid unary expression");
 

@@ -11,8 +11,8 @@ struct Node {
 	struct Node *left;
 	struct Node *right;
 
-	Node(const std::string& oper, Node *leftNode, Node *rightNode) { op = oper; left = leftNode; right = rightNode; };
-	Node(const std::string& oper, Node *leftNode, Node *rightNode, TokenType itemType) { op = oper; left = leftNode; right = rightNode; type = itemType; };
+	Node(std::string oper, Node *leftNode, Node *rightNode) { op = oper; left = leftNode; right = rightNode; };
+	Node(std::string oper, Node *leftNode, Node *rightNode, TokenType itemType) { op = oper; left = leftNode; right = rightNode; type = itemType; };
 	Node(std::string oper) { op = oper; left = nullptr; right = nullptr; };
 	Node(std::string oper, TokenType itemType) { op = oper; left = nullptr; right = nullptr; type = itemType; };
 };
@@ -35,7 +35,7 @@ private:
 	void DeleteNode(Node *node);
 	void PrintNode(Node *node);
 
-	std::map<std::string, int> operators = {{"let", -1},{"=", 0},{"||", 1}, {"&&", 2}, {"<", 3}, {"<=", 3},{">", 3}, {">=", 3}, {"==", 3}, {"!=", 3},{"+", 4}, {"-", 4}, {"*", 5}, {"/", 5}, {"%", 5}, {"**", 6}, {"u+", 7}, {"u-", 7}, {"!", 7}};
+	std::map<std::string, int> operators = {{"let", -1},{"=", 0}, {"+=", 0}, {"-=", 0}, {"*=", 0}, {"/=", 0}, {"%=", 0},{"||", 1}, {"&&", 2}, {"<", 3}, {"<=", 3},{">", 3}, {">=", 3}, {"==", 3}, {"!=", 3}, {"===", 3}, {"!==", 3},{"+", 4}, {"-", 4}, {"*", 5}, {"/", 5}, {"%", 5}, {"**", 6}, {"u+", 7}, {"u-", 7}, {"!", 7}, {"++", 7}, {"--", 7}};
 	std::vector<Token> tokens;
 	std::vector<Node*> output;
 };

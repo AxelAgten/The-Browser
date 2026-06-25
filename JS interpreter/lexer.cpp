@@ -15,6 +15,13 @@ std::ostream& operator<<(std::ostream& os, TokenType t) {
     case TokenType::Star: return os << "Star";
     case TokenType::Slash: return os << "Slash";
     case TokenType::Percent: return os << "Percent";
+    case TokenType::PlusEquals: return os << "PlusEquals";
+    case TokenType::MinEquals: return os << "MinEquals";
+    case TokenType::StarEquals: return os << "StarEquals";
+    case TokenType::SlashEquals: return os << "SlashEquals";
+    case TokenType::PercentEquals: return os << "PercentEquals";
+    case TokenType::PlusPlus: return os << "PlusPlus";
+    case TokenType::MinMin: return os << "MinMin";
     case TokenType::ExclamationMark: return os << "ExclamationMark";
     case TokenType::StarStar: return os << "StarStar";
     case TokenType::LeftParen: return os << "LeftParen";
@@ -36,6 +43,8 @@ std::ostream& operator<<(std::ostream& os, TokenType t) {
     case TokenType::SmallerThen: return os << "SmallerThen";
     case TokenType::Not: return os << "Not";
     case TokenType::NotEquals: return os << "NotEquals";
+    case TokenType::StrictEquals: return os << "StrictEquals";
+    case TokenType::StrictNotEquals: return os << "StrictNotEquals";
     case TokenType::Semicolon: return os << "Semicolon";
     case TokenType::NewLine: return os << "NewLine";
     case TokenType::EndOfFile: return os << "EndOfFile";
@@ -240,6 +249,16 @@ void Lexer::ParseCharacter(std::vector<Token> &tokens, const std::string &input,
     token.line = line;
 
     if (character == '+') {
+        if (index + 1 <= input.size() && input[index + 1] == '=') {
+            tokens.push_back({TokenType::PlusEquals, "+=", line});
+            index++;
+            return;
+        }
+        if (index + 1 <= input.size() && input[index + 1] == '+') {
+            tokens.push_back({TokenType::PlusPlus, "++", line});
+            index++;
+            return;
+        }
         token.type = TokenType::Plus;
     } else if (character == '*') {
         if (index + 1 <= input.size() && input[index + 1] == '*') {
@@ -247,12 +266,37 @@ void Lexer::ParseCharacter(std::vector<Token> &tokens, const std::string &input,
             index++;
             return;
         }
+        if (index + 1 <= input.size() && input[index + 1] == '=') {
+            tokens.push_back({TokenType::StarEquals, "*=", line});
+            index++;
+            return;
+        }
         token.type = TokenType::Star;
     } else if (character == '-') {
+        if (index + 1 <= input.size() && input[index + 1] == '=') {
+            tokens.push_back({TokenType::MinEquals, "-=", line});
+            index++;
+            return;
+        }
+        if (index + 1 <= input.size() && input[index + 1] == '-') {
+            tokens.push_back({TokenType::MinMin, "--", line});
+            index++;
+            return;
+        }
         token.type = TokenType::Minus;
     } else if (character == '/') {
+        if (index + 1 <= input.size() && input[index + 1] == '=') {
+            tokens.push_back({TokenType::SlashEquals, "/=", line});
+            index++;
+            return;
+        }
         token.type = TokenType::Slash;
     } else if (character == '%') {
+        if (index + 1 <= input.size() && input[index + 1] == '=') {
+            tokens.push_back({TokenType::PercentEquals, "%=", line});
+            index++;
+            return;
+        }
         token.type = TokenType::Percent;
     } else if (character == '!') {
         token.type = TokenType::ExclamationMark;
@@ -322,7 +366,7 @@ void Lexer::FlushWord(std::vector<Token>& tokens, std::string& word, size_t line
     } else if (word == "=") {
         token.type = TokenType::Equals;
     } else if (word == "!") {
-        token.type = TokenType::Not;
+        token.type = TokenType::ExclamationMark;
     } else if (word == "&&") {
         token.type = TokenType::And;
     } else if (word == "||") {
@@ -337,6 +381,10 @@ void Lexer::FlushWord(std::vector<Token>& tokens, std::string& word, size_t line
         token.type = TokenType::LargerThen;
     } else if (word == "!=") {
         token.type = TokenType::NotEquals;
+    } else if (word == "===") {
+        token.type = TokenType::StrictEquals;
+    } else if (word == "!==") {
+        token.type = TokenType::StrictNotEquals;
     } else {
         token.type = TokenType::Identifier;
     }

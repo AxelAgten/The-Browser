@@ -1,3 +1,12 @@
+let x = "5";
+x++
+--x
+
+x==="6"
+!x
+
+"0x10" - 9
+
 "5"+"2"
 "2"**3
 "\x4a b *"
@@ -7,6 +16,6 @@ let b = "black";
 "I drew: " + "3" * 2 + " of hearts";
 "5"*true;
 true % 4
-0/0+"hello"
+"b" + "a" + + "a" + "a"
 
 -1/0 + " help"

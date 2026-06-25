@@ -10,6 +10,9 @@ Interpreter::Interpreter(const std::vector<Node*> &nodeList) : nodes(nodeList) {
 
 }
 
+std::ostream& operator<<(std::ostream& os, const undefined&) {return os << "undefined";}
+std::ostream& operator<<(std::ostream& os, const null&) {return os << "null";}
+
 Value Interpreter::EvaluateExpression(Node* node) {
 	if (!(node->left || node->right)) {
 		if (node->type == TokenType::Number) {
@@ -24,327 +27,224 @@ Value Interpreter::EvaluateExpression(Node* node) {
 		if (node->type == TokenType::String) {
 			return node->op;
 		}
+		if (variables.find(node->op) == variables.end()) {
+			throw std::runtime_error("ReferenceError: '" +node->op + "' is not defined");
+		}
 		return variables[node->op];
 	}
 
-	auto doubleToStr = []<typename T>(T&& v) -> std::string {
-		if constexpr (std::is_same_v<std::decay_t<T>, double>) {
-			if (std::isnan(v)) return "NaN";
-			if (std::isinf(v)) return v > 0 ? "Infinity" : "-Infinity";
-
-			std::ostringstream oss;
-			if (v == static_cast<long long>(v))
-				oss << static_cast<long long>(v);
-			else
-				oss << v;
-			return oss.str();
-		}
-		return "";
-	};
-
-	auto strToDouble = []<typename T>(T&& v) -> double {
-		if constexpr (std::is_same_v<std::decay_t<T>, std::string>) {
-			if (v == "") return 0.0;
-			bool isWhiteSpace = true;
-			for (const char &c : v) {
-				if (!isspace(c)) isWhiteSpace = false;
-			}
-			if (isWhiteSpace) return 0.0;
-
-			try {
-				return std::stod(v);
-			}
-			catch (const std::invalid_argument& e) {
-				return std::numeric_limits<double>::quiet_NaN();
-			}
-			catch (const std::out_of_range& e) {
-				return std::numeric_limits<double>::quiet_NaN();
-			}
-		}
-		return std::numeric_limits<double>::quiet_NaN();
-	};
-
-	auto isStrDouble = []<typename T>(T&& v) -> bool {
-		if constexpr (std::is_same_v<std::decay_t<T>, std::string>) {
-			try {
-				double d = std::stod(v);
-				return true;
-			}
-			catch (const std::invalid_argument& e) {
-				return false;
-			}
-			catch (const std::out_of_range& e) {
-				return false;
-			}
-		}
-		return false;
-	};
-
-	auto boolToStr = []<typename T>(T&& v) -> std::string {
+	auto tokenTypeFromBool = []<typename  T>(T&& v) -> TokenType {
 		if constexpr (std::is_same_v<std::decay_t<T>, bool>) {
 			if (v) {
-				return "true";
+				return TokenType::True;
 			}
-			return "false";
+			return TokenType::False;
 		}
-		return "NaN";
+		throw std::runtime_error("This variable is no boolean");
 	};
 
-	auto boolToDouble = []<typename T>(T&& v) -> double {
-		if constexpr (std::is_same_v<std::decay_t<T>, bool>) {
-			if (v) {
-				return 1;
-			}
-			return 0;
-		}
-		return std::numeric_limits<double>::quiet_NaN();
-	};
+	if (node->left && !node->right && node->left->type == TokenType::Identifier && (node->type == TokenType::PlusPlus || node->type == TokenType::MinMin)) {
+		if (variables.find(node->left->op) == variables.end()) throw std::runtime_error(node->op + " not used on a variable");
 
-	auto isNanSafe = []<typename T>(T&& v) -> bool {
-		if constexpr (std::is_same_v<std::decay_t<T>, double>) {
-			return std::isnan(v);
+		Node *parent, *right, *left;
+
+		std::visit([&](auto&& a) {
+			using A = std::decay_t<decltype(a)>;
+			if constexpr (std::is_same_v<A, double>) {
+				left = new Node(DoubleToStr(a), nullptr, nullptr, TokenType::Number);
+			} else if constexpr (std::is_same_v<A, std::string>) {
+				left = new Node(a, nullptr, nullptr, TokenType::Number);
+			} else if constexpr (std::is_same_v<A, bool>) {
+				left = new Node(DoubleToStr(BoolToDouble(a)), nullptr, nullptr, TokenType::Number);
+			}
+		}, variables[node->left->op]);
+
+		right = new Node("1", nullptr, nullptr, TokenType::Number);
+
+		switch (node->type) {
+		case TokenType::PlusPlus: parent = new Node("+", left, right, TokenType::Plus); break;
+		case TokenType::MinMin: parent = new Node("-", left, right, TokenType::Minus); break;
 		}
-		return false;
-	};
+
+		Value value = EvaluateExpression(parent);
+		delete left; delete right; delete parent;
+		variables[node->left->op] = value;
+		return value;
+	}
+	if (!node->left && node->right && node->right->type == TokenType::Identifier  && (node->type == TokenType::PlusPlus || node->type == TokenType::MinMin)) {
+		if (variables.find(node->right->op) == variables.end()) throw std::runtime_error(node->op + " not used on a variable");
+
+		Node *parent, *right, *left;
+		Value value = variables[node->right->op];
+
+		std::visit([&](auto&& a) {
+			using A = std::decay_t<decltype(a)>;
+			if constexpr (std::is_same_v<A, double>) {
+				left = new Node(DoubleToStr(a), nullptr, nullptr, TokenType::Number);
+			} else if constexpr (std::is_same_v<A, std::string>) {
+				left = new Node(a, nullptr, nullptr, TokenType::Number);
+			} else if constexpr (std::is_same_v<A, bool>) {
+				left = new Node(DoubleToStr(BoolToDouble(a)), nullptr, nullptr, TokenType::Number);
+			}
+		}, variables[node->right->op]);
+
+
+		right = new Node("1", nullptr, nullptr, TokenType::Number);
+
+		switch (node->type) {
+		case TokenType::PlusPlus: parent = new Node("+", left, right, TokenType::Plus); break;
+		case TokenType::MinMin: parent = new Node("-", left, right, TokenType::Minus); break;
+		}
+
+		Value newValue = EvaluateExpression(parent);
+		delete left; delete right; delete parent;
+		variables[node->right->op] = newValue;
+		return value;
+	}
 
 	if (node->left && !node->right) {
 		Value left = EvaluateExpression(node->left);
-		return std::visit([&](auto&& a) -> Value {
+		switch (node->type) {
+		case TokenType::Plus: return ToNumber(left);
+		case TokenType::Minus: return -ToNumber(left);
+		case TokenType::ExclamationMark: return !ToBool(left);
+		}
+	}
+
+	if (node->type == TokenType::Let) {
+		if (variables.find(node->left->op) != variables.end()) {
+			throw std::runtime_error("SyntaxError: Identifier '" +node->op + "' has already been declared");
+		}
+		variables.emplace(node->left->op, EvaluateExpression(node->right));
+		return variables[node->left->op];
+	}
+
+	if (node->type == TokenType::Equals) {
+		if (variables.find(node->left->op) == variables.end()) {
+			throw std::runtime_error("variable " + node->left->op + " does not exist");
+
+		}
+		variables.at(node->left->op) = EvaluateExpression(node->right);
+		return variables[node->left->op];
+	}
+
+	if (node->type == TokenType::StrictEquals) {
+		Value left = EvaluateExpression(node->left);
+		Value right = EvaluateExpression(node->right);
+		return left.index() == right.index() && left == right;
+	}
+	if (node->type == TokenType::StrictNotEquals) {
+		Value left = EvaluateExpression(node->left);
+		Value right = EvaluateExpression(node->right);
+		return left.index() != right.index() || left != right;
+	}
+
+	if (node->type == TokenType::PlusEquals || node->type == TokenType::MinEquals || node->type == TokenType::StarEquals || node->type == TokenType::SlashEquals || node->type == TokenType::PercentEquals) {
+		if (node->left->type != TokenType::Identifier) {
+			throw std::runtime_error("This operator can only be used on variables");
+		}
+		if (variables.find(node->left->op) == variables.end()) {
+			throw std::runtime_error("variable " + node->left->op + " does not exist");
+		}
+
+		Node *left, *parent;
+
+		std::visit([&](auto&& a) {
 			using A = std::decay_t<decltype(a)>;
 			if constexpr (std::is_same_v<A, double>) {
-				switch (node->type) {
-					case TokenType::Plus: return +a;
-					case TokenType::Minus: return -a;
-					case TokenType::ExclamationMark: return a == 0;
-				}
+				left = new Node(DoubleToStr(a), nullptr, nullptr, TokenType::Number);
+			} else if constexpr (std::is_same_v<A, std::string>) {
+				left = new Node(a, nullptr, nullptr, TokenType::String);
+			} else if constexpr (std::is_same_v<A, bool>) {
+				left = new Node(BoolToStr(a), nullptr, nullptr, tokenTypeFromBool(a));
 			}
-			else if constexpr (std::is_same_v<A, bool>) {
-				switch (node->type) {
-					case TokenType::Plus: return +boolToDouble(a);
-					case TokenType::Minus: return -boolToDouble(a);
-					case TokenType::ExclamationMark: return !a;
-				}
-			}
-			else if constexpr (std::is_same_v<A, std::string>) {
-				switch (node->type) {
-					case TokenType::Plus: return +strToDouble(a);
-					case TokenType::Minus: return -strToDouble(a);
-					case TokenType::ExclamationMark: return a != "";
-				}
-			}
-			throw std::runtime_error("Unknown operator: " + node->op);
-		}, left);
-	}
+		}, variables[node->left->op]);
 
-	if (node->op == "let") {
-		variables.emplace(node->left->op, EvaluateExpression(node->right));
-		return 0.0;
-	}
+		switch (node->type) {
+		case TokenType::PlusEquals: parent = new Node("+", left, node->right, TokenType::Plus); break;
+		case TokenType::MinEquals: parent = new Node("-", left, node->right, TokenType::Minus); break;
+		case TokenType::StarEquals: parent = new Node("*", left, node->right, TokenType::Star); break;
+		case TokenType::SlashEquals: parent = new Node("/", left, node->right, TokenType::Slash); break;
+		case TokenType::PercentEquals: parent = new Node("%", left, node->right, TokenType::Percent); break;
+		}
 
-	if (node->op == "=") {
-		variables.at(node->left->op) = EvaluateExpression(node->right);
-		return 0.0;
+		Value value = EvaluateExpression(parent);
+		delete left;
+		delete parent;
+		variables[node->left->op] = value;
+		return value;
 	}
 
 	Value left = EvaluateExpression(node->left);
 	Value right = EvaluateExpression(node->right);
 
-	return std::visit([&](auto&& a) -> Value {
-	    return std::visit([&](auto&& b) -> Value {
-	        using A = std::decay_t<decltype(a)>;
-	        using B = std::decay_t<decltype(b)>;
+	switch (node->type) {
+	case TokenType::Plus: {
 
-	    	if constexpr (std::is_same_v<A, double> && std::is_same_v<B, double>) {
+		if (std::holds_alternative<std::string>(left) ||
+			std::holds_alternative<std::string>(right))
+		{
+			return ToString(left) + ToString(right);
+		}
 
-				switch (node->type) {
-					case TokenType::Plus: return a + b;
-					case TokenType::Minus: return a - b;
-					case TokenType::Star: return a * b;
-					case TokenType::Slash: return a / b;
-					case TokenType::Percent: return std::fmod(a, b);
-					case TokenType::StarStar: return pow(a, b);
-					case TokenType::LargerThen:
-						if (isNanSafe(a) || isNanSafe(b)) return false;
-						return a > b;
-					case TokenType::LargerEquals:
-						if (isNanSafe(a) || isNanSafe(b)) return false;
-						return a >= b;
-					case TokenType::SmallerThen:
-						if (isNanSafe(a) || isNanSafe(b)) return false;
-						return a < b;
-					case TokenType::SmallerEquals:
-						if (isNanSafe(a) || isNanSafe(b)) return false;
-						return a <= b;
-					case TokenType::Equals:
-						if (isNanSafe(a) || isNanSafe(b)) return false;
-						return a == b;
-					case TokenType::NotEquals:
-						if (isNanSafe(a) || isNanSafe(b)) return false;
-						return a != b;
-				}
-			}
-	    	else if constexpr (std::is_same_v<A, bool> && std::is_same_v<B, bool>) {
+		return ToNumber(left) + ToNumber(right);
+	}
+	case TokenType::Minus: return ToNumber(left) - ToNumber(right);
+	case TokenType::Star: return ToNumber(left) * ToNumber(right);
+	case TokenType::Slash: return ToNumber(left) / ToNumber(right);
+	case TokenType::Percent: return std::fmod(ToNumber(left), ToNumber(right));
+	case TokenType::StarStar: return pow(ToNumber(left), ToNumber(right));
+	case TokenType::LargerThen: {
+		if (std::holds_alternative<std::string>(left) &&
+			std::holds_alternative<std::string>(right))
+		{
+			return ToString(left) > ToString(right);
+		}
+		return ToNumber(left) > ToNumber(right);
+	}
+	case TokenType::LargerEquals: {
+		if (std::holds_alternative<std::string>(left) &&
+			std::holds_alternative<std::string>(right))
+		{
+			return ToString(left) >= ToString(right);
+		}
+		return ToNumber(left) >= ToNumber(right);
+	}
+	case TokenType::SmallerThen: {
+		if (std::holds_alternative<std::string>(left) &&
+			std::holds_alternative<std::string>(right))
+		{
+			return ToString(left) < ToString(right);
+		}
+		return ToNumber(left) < ToNumber(right);
+	}
+	case TokenType::SmallerEquals: {
+		if (std::holds_alternative<std::string>(left) &&
+			std::holds_alternative<std::string>(right))
+		{
+			return ToString(left) <= ToString(right);
+		}
+		return ToNumber(left) <= ToNumber(right);
+	}
+	case TokenType::Equals: return LooseEquals(left, right);
+	case TokenType::NotEquals: return !LooseEquals(left, right);
+	case TokenType::And:
+	{
+		if (!ToBool(left))
+			return left;
 
-				switch (node->type) {
-					case TokenType::And: return a && b;
-					case TokenType::Or: return a || b;
-					case TokenType::Equals: return a == b;
-					case TokenType::NotEquals: return a != b;
-					case TokenType::Plus: return boolToDouble(a) + boolToDouble(b);
-					case TokenType::Minus: return boolToDouble(a) - boolToDouble(b);
-					case TokenType::Star: return boolToDouble(a) * boolToDouble(b);
-					case TokenType::Slash: return boolToDouble(a) / boolToDouble(b);
-					case TokenType::Percent: return std::fmod(boolToDouble(a), boolToDouble(b));
-					case TokenType::StarStar: return pow(boolToDouble(a), boolToDouble(b));
-					case TokenType::LargerThen: return boolToDouble(a) > boolToDouble(b);
-					case TokenType::LargerEquals: return boolToDouble(a) >= boolToDouble(b);
-					case TokenType::SmallerThen: return boolToDouble(a) < boolToDouble(b);
-					case TokenType::SmallerEquals: return boolToDouble(a) <= boolToDouble(b);
-				}
-			}
-	    	else if constexpr (std::is_same_v<A, std::string> && std::is_same_v<B, std::string>) {
-				switch (node->type) {
-					case TokenType::Plus: return a + b;
-					case TokenType::Minus: return strToDouble(a) - strToDouble(b);
-					case TokenType::Star: return strToDouble(a) * strToDouble(b);
-					case TokenType::Slash: return strToDouble(a) / strToDouble(b);
-					case TokenType::Percent: return std::fmod(strToDouble(a), strToDouble(b));
-					case TokenType::StarStar: return pow(strToDouble(a), strToDouble(b));
-					case TokenType::LargerThen: return a > b;
-					case TokenType::LargerEquals: return a >= b;
-					case TokenType::SmallerThen: return a < b;
-					case TokenType::SmallerEquals: return a <= b;
-					case TokenType::Equals: return a == b;
-					case TokenType::NotEquals: return a != b;
-				}
-			}
-	    	else if constexpr (std::is_same_v<A, double> && std::is_same_v<B, std::string>) {
+		return right;
+	}
 
-				switch (node->type) {
-					case TokenType::Plus: return doubleToStr(a) + b;
-					case TokenType::Minus: return a - strToDouble(b);
-					case TokenType::Star: return a * strToDouble(b);
-					case TokenType::Slash: return a / strToDouble(b);
-					case TokenType::Percent: return std::fmod(a, strToDouble(b));
-					case TokenType::StarStar: return pow(a, strToDouble(b));
-					case TokenType::Equals:
-						if (isStrDouble(b)) return a == strToDouble(b);
-						return false;
-					case TokenType::LargerThen:
-						if (isStrDouble(b)) return a > strToDouble(b);
-						return false;
-					case TokenType::LargerEquals:
-						if (isStrDouble(b)) return a >= strToDouble(b);
-						return false;
-					case TokenType::SmallerThen:
-						if (isStrDouble(b)) return a < strToDouble(b);
-						return false;
-					case TokenType::SmallerEquals:
-						if (isStrDouble(b)) return a <= strToDouble(b);
-						return false;
-					case TokenType::NotEquals:
-						if (isStrDouble(b)) return a != strToDouble(b);
-						return false;
-				}
-			}
-	    	else if constexpr (std::is_same_v<A, std::string> && std::is_same_v<B, double>) {
-				switch (node->type) {
-					case TokenType::Plus: return a + doubleToStr(b);
-					case TokenType::Minus: return strToDouble(a) - b;
-					case TokenType::Star: return strToDouble(a) * b;
-					case TokenType::Slash: return strToDouble(a) / b;
-					case TokenType::Percent: return std::fmod(strToDouble(a), b);
-					case TokenType::StarStar: return pow(strToDouble(a), b);
-					case TokenType::Equals:
-						if (isStrDouble(a)) return strToDouble(a) == b;
-						return false;
-					case TokenType::LargerThen:
-						if (isStrDouble(a)) return strToDouble(a) > b;
-						return false;
-					case TokenType::LargerEquals:
-						if (isStrDouble(a)) return strToDouble(a) >= b;
-						return false;
-					case TokenType::SmallerThen:
-						if (isStrDouble(a)) return strToDouble(a) < b;
-						return false;
-					case TokenType::SmallerEquals:
-						if (isStrDouble(a)) return strToDouble(a) <= b;
-						return false;
-					case TokenType::NotEquals:
-						if (isStrDouble(a)) return strToDouble(a) != b;
-						return false;
-				}
-			}
-	    	else if constexpr (std::is_same_v<A, bool> && std::is_same_v<B, std::string>) {
+	case TokenType::Or:
+	{
+		if (ToBool(left))
+			return left;
 
-				switch (node->type) {
-					case TokenType::Plus: return boolToStr(a) + b;
-					case TokenType::Star: return boolToDouble(a) * strToDouble(b);
-					case TokenType::Minus: return boolToDouble(a) - strToDouble(b);
-					case TokenType::Slash: return boolToDouble(a) / strToDouble(b);
-					case TokenType::Percent: return std::fmod(boolToDouble(a), strToDouble(b));
-					case TokenType::StarStar: return pow(boolToDouble(a), strToDouble(b));
-					case TokenType::LargerThen: return boolToDouble(a) > strToDouble(b);
-					case TokenType::LargerEquals: return boolToDouble(a) >= strToDouble(b);
-					case TokenType::SmallerThen: return boolToDouble(a) < strToDouble(b);
-					case TokenType::SmallerEquals: return boolToDouble(a) <= strToDouble(b);
-					case TokenType::Equals: return boolToDouble(a) == strToDouble(b);
-					case TokenType::NotEquals: return boolToDouble(a) != strToDouble(b);
-				}
-			}
-	    	else if constexpr (std::is_same_v<A, std::string> && std::is_same_v<B, bool>) {
-				switch (node->type) {
-					case TokenType::Plus: return a + boolToStr(b);
-					case TokenType::Star: return strToDouble(a) * boolToDouble(b);
-					case TokenType::Minus: return strToDouble(a) - boolToDouble(a);
-					case TokenType::Slash: return strToDouble(a) / boolToDouble(a);
-					case TokenType::Percent: return std::fmod(strToDouble(a), boolToDouble(a));
-					case TokenType::StarStar: return pow(strToDouble(a), boolToDouble(a));
-					case TokenType::LargerThen: return strToDouble(a) > boolToDouble(a);
-					case TokenType::LargerEquals: return strToDouble(a) >= boolToDouble(a);
-					case TokenType::SmallerThen: return strToDouble(a) < boolToDouble(a);
-					case TokenType::SmallerEquals: return strToDouble(a) <= boolToDouble(a);
-					case TokenType::Equals: return strToDouble(a) == boolToDouble(a);
-					case TokenType::NotEquals: return strToDouble(a) != boolToDouble(a);
-				}
-			}
-	    	else if constexpr (std::is_same_v<A, double> && std::is_same_v<B, bool>) {
-				switch (node->type) {
-					case TokenType::Plus: return a + b;
-					case TokenType::Minus: return a - b;
-					case TokenType::Star: return a * b;
-					case TokenType::Slash: return a / b;
-					case TokenType::Percent: return std::fmod(a, b);
-					case TokenType::StarStar: return pow(a, boolToDouble(b));
-					case TokenType::LargerThen: return a > b;
-					case TokenType::LargerEquals: return a >= b;
-					case TokenType::SmallerThen: return a < b;
-					case TokenType::SmallerEquals: return a <= b;
-					case TokenType::Equals: return a == b;
-					case TokenType::NotEquals: return a != b;
-				}
-			}
-	    	else if constexpr (std::is_same_v<A, bool> && std::is_same_v<B, double>) {
-				switch (node->type) {
-					case TokenType::Plus: return a + b;
-					case TokenType::Minus: return a - b;
-					case TokenType::Star: return a * b;
-					case TokenType::Slash: return a / b;
-					case TokenType::Percent: return std::fmod(a, b);
-					case TokenType::StarStar: return pow(boolToDouble(a), b);
-					case TokenType::LargerThen: return a > b;
-					case TokenType::LargerEquals: return a >= b;
-					case TokenType::SmallerThen: return a < b;
-					case TokenType::SmallerEquals: return a <= b;
-					case TokenType::Equals: return a == b;
-					case TokenType::NotEquals: return a != b;
-				}
-			}
-
-	        throw std::runtime_error("Unknown operator: " + node->op);
-
-	    }, right);
-	}, left);
+		return right;
+	}
+	}
+	return 0.0;
 }
 
 bool Interpreter::IsDouble(const std::string& s) {
@@ -359,4 +259,181 @@ bool Interpreter::IsDouble(const std::string& s) {
 	} catch (const std::out_of_range&) {
 		return false;
 	}
+}
+
+std::string Interpreter::DoubleToStr(Value v) {
+	return std::visit([&](auto&& a) -> std::string {
+		using A = std::decay_t<decltype(a)>;
+		if constexpr (std::is_same_v<A, double>) {
+			if (std::isnan(a)) return "NaN";
+			if (std::isinf(a)) return a > 0 ? "Infinity" : "-Infinity";
+
+			std::ostringstream oss;
+			if (a == static_cast<long long>(a))
+				oss << static_cast<long long>(a);
+			else
+				oss << a;
+			return oss.str();
+		}
+		throw std::runtime_error("this is not a double");
+	}, v);
+}
+
+double Interpreter::StrToNumber(Value v) {
+	return std::visit([&](auto&& a) -> double {
+		using A = std::decay_t<decltype(a)>;
+		if constexpr (std::is_same_v<A, std::string>) {
+			if (a == "") return 0.0;
+			bool isWhiteSpace = true;
+			for (const char &c : a) {
+				if (!isspace(c)) isWhiteSpace = false;
+			}
+			if (isWhiteSpace) return 0.0;
+
+			try {
+				size_t pos;
+				double d = std::stod(a,&pos);
+				if(pos != a.size())
+					return std::numeric_limits<double>::quiet_NaN();
+				return d;
+			}
+			catch (const std::invalid_argument& e) {
+				return std::numeric_limits<double>::quiet_NaN();
+			}
+			catch (const std::out_of_range& e) {
+				return std::numeric_limits<double>::quiet_NaN();
+			}
+		}
+		return std::numeric_limits<double>::quiet_NaN();
+	}, v);
+}
+
+std::string Interpreter::BoolToStr(Value v) {
+	return std::visit([&](auto&& a) -> std::string {
+		using A = std::decay_t<decltype(a)>;
+		if constexpr (std::is_same_v<A, bool>) {
+			if (a) {
+				return "true";
+			}
+			return "false";
+		}
+		return "NaN";
+	}, v);
+}
+
+double Interpreter::BoolToDouble(Value v) {
+	return std::visit([&](auto&& a) -> double{
+		using A = std::decay_t<decltype(a)>;
+		if constexpr (std::is_same_v<A, bool>) {
+			if (a) {
+				return 1;
+			}
+			return 0;
+		}
+		return std::numeric_limits<double>::quiet_NaN();
+	}, v);
+}
+
+double Interpreter::ToNumber(Value v) {
+	return std::visit([&](auto&& a) -> double {
+		using A = std::decay_t<decltype(a)>;
+		if constexpr (std::is_same_v<A, double>) {
+			return a;
+		}
+		if constexpr (std::is_same_v<A, bool>) {
+			return BoolToDouble(a);
+		}
+		if constexpr (std::is_same_v<A, std::string>) {
+			return StrToNumber(a);
+		}
+		if constexpr (std::is_same_v<A, null>) {
+			return  0.0;
+		}
+		if constexpr (std::is_same_v<A, undefined>) {
+			return std::numeric_limits<double>::quiet_NaN();
+		}
+		throw std::runtime_error("can not convert this item to a number");
+	}, v);
+}
+
+std::string Interpreter::ToString(Value v) {
+	return std::visit([&](auto&& a) -> std::string {
+		using A = std::decay_t<decltype(a)>;
+		if constexpr (std::is_same_v<A, double>) {
+		return DoubleToStr(a);
+	}
+	if constexpr (std::is_same_v<A, bool>) {
+		return BoolToStr(a);
+	}
+	if constexpr (std::is_same_v<A, std::string>) {
+		return a;
+	}
+	if constexpr (std::is_same_v<A, undefined>) {
+		return "undefined";
+	}
+	if constexpr (std::is_same_v<A, null>) {
+		return "null";
+	}
+	throw std::runtime_error("can not convert this item to a string");
+	}, v);
+}
+
+bool Interpreter::ToBool(Value v) {
+	return std::visit([&](auto&& a) -> bool {
+		using A = std::decay_t<decltype(a)>;
+		if constexpr (std::is_same_v<A, bool>) {
+			return a;
+		}
+		if constexpr (std::is_same_v<A, double>) {
+			return a != 0 && !std::isnan(a);
+		}
+		if constexpr (std::is_same_v<A, std::string>) {
+			return !a.empty();
+		}
+		if constexpr (std::is_same_v<A, undefined>) {
+			return false;
+		}
+		if constexpr (std::is_same_v<A, null>) {
+			return false;
+		}
+		throw std::runtime_error("can not convert this item to a bool");
+	}, v);
+}
+
+bool Interpreter::LooseEquals(Value left, Value right)
+{
+	// same type
+	if (left.index() == right.index())
+		return left == right;
+
+
+	// null == undefined
+	if ((std::holds_alternative<null>(left) &&
+		 std::holds_alternative<undefined>(right)) ||
+		(std::holds_alternative<undefined>(left) &&
+		 std::holds_alternative<null>(right)))
+	{
+		return true;
+	}
+
+
+	// boolean gets converted to number
+	if (std::holds_alternative<bool>(left))
+		left = ToNumber(left);
+
+	if (std::holds_alternative<bool>(right))
+		right = ToNumber(right);
+
+
+	// number/string conversion
+	if ((std::holds_alternative<double>(left) &&
+		 std::holds_alternative<std::string>(right)) ||
+		(std::holds_alternative<std::string>(left) &&
+		 std::holds_alternative<double>(right)))
+	{
+		return ToNumber(left) == ToNumber(right);
+	}
+
+
+	return false;
 }
