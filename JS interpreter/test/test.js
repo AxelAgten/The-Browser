@@ -1,3 +1,7 @@
+let y = undefined;
+
+y - 4
+
 let x = "5";
 x++
 --x

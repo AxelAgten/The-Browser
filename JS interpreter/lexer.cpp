@@ -45,6 +45,8 @@ std::ostream& operator<<(std::ostream& os, TokenType t) {
     case TokenType::NotEquals: return os << "NotEquals";
     case TokenType::StrictEquals: return os << "StrictEquals";
     case TokenType::StrictNotEquals: return os << "StrictNotEquals";
+    case TokenType::Undefined: return os << "Undefined";
+    case TokenType::Null: return os << "Null";
     case TokenType::Semicolon: return os << "Semicolon";
     case TokenType::NewLine: return os << "NewLine";
     case TokenType::EndOfFile: return os << "EndOfFile";
@@ -385,6 +387,10 @@ void Lexer::FlushWord(std::vector<Token>& tokens, std::string& word, size_t line
         token.type = TokenType::StrictEquals;
     } else if (word == "!==") {
         token.type = TokenType::StrictNotEquals;
+    } else if (word == "undefined") {
+        token.type = TokenType::Undefined;
+    } else if (word == "null") {
+        token.type = TokenType::Null;
     } else {
         token.type = TokenType::Identifier;
     }

@@ -27,10 +27,30 @@ Value Interpreter::EvaluateExpression(Node* node) {
 		if (node->type == TokenType::String) {
 			return node->op;
 		}
+		if (node->type == TokenType::Undefined) {
+			return undefined{};
+		}
+		if (node->type == TokenType::Null) {
+			return null{};
+		}
 		if (variables.find(node->op) == variables.end()) {
 			throw std::runtime_error("ReferenceError: '" +node->op + "' is not defined");
 		}
 		return variables[node->op];
+	}
+
+	if (node->type == TokenType::Let) {
+		if (variables.find(node->left->op) != variables.end()) {
+			throw std::runtime_error("SyntaxError: Identifier '" +node->op + "' has already been declared");
+		}
+
+		if (node->left && !node->right) {
+			variables.emplace(node->left->op, undefined{});
+			return undefined{};
+		}
+
+		variables.emplace(node->left->op, EvaluateExpression(node->right));
+		return variables[node->left->op];
 	}
 
 	auto tokenTypeFromBool = []<typename  T>(T&& v) -> TokenType {
@@ -109,14 +129,6 @@ Value Interpreter::EvaluateExpression(Node* node) {
 		case TokenType::Minus: return -ToNumber(left);
 		case TokenType::ExclamationMark: return !ToBool(left);
 		}
-	}
-
-	if (node->type == TokenType::Let) {
-		if (variables.find(node->left->op) != variables.end()) {
-			throw std::runtime_error("SyntaxError: Identifier '" +node->op + "' has already been declared");
-		}
-		variables.emplace(node->left->op, EvaluateExpression(node->right));
-		return variables[node->left->op];
 	}
 
 	if (node->type == TokenType::Equals) {
@@ -402,12 +414,10 @@ bool Interpreter::ToBool(Value v) {
 
 bool Interpreter::LooseEquals(Value left, Value right)
 {
-	// same type
 	if (left.index() == right.index())
 		return left == right;
 
 
-	// null == undefined
 	if ((std::holds_alternative<null>(left) &&
 		 std::holds_alternative<undefined>(right)) ||
 		(std::holds_alternative<undefined>(left) &&
@@ -417,7 +427,6 @@ bool Interpreter::LooseEquals(Value left, Value right)
 	}
 
 
-	// boolean gets converted to number
 	if (std::holds_alternative<bool>(left))
 		left = ToNumber(left);
 
@@ -425,7 +434,6 @@ bool Interpreter::LooseEquals(Value left, Value right)
 		right = ToNumber(right);
 
 
-	// number/string conversion
 	if ((std::holds_alternative<double>(left) &&
 		 std::holds_alternative<std::string>(right)) ||
 		(std::holds_alternative<std::string>(left) &&

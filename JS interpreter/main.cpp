@@ -22,6 +22,12 @@ int main() {
             else if constexpr (std::is_same_v<T, bool>) {
                 std::cout << (value ? "true" : "false");
             }
+            else if constexpr (std::is_same_v<T, undefined>) {
+                std::cout << "undefined";
+            }
+            else if constexpr (std::is_same_v<T, null>) {
+                std::cout << "null";
+            }
             else {
                 std::cout << value;
             }

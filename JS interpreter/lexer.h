@@ -43,6 +43,8 @@ enum class TokenType
     NotEquals,
     StrictEquals,
     StrictNotEquals,
+    Undefined,
+    Null,
     Semicolon,
     NewLine,
     EndOfFile

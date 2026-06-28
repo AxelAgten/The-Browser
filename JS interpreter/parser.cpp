@@ -27,7 +27,14 @@ std::vector<Node*>& Parser::ParseToAst() {
 	for (auto &token : tokens) {
 		if (token.type == TokenType::Semicolon || token.type == TokenType::NewLine) {
 			if (inLet) {
-				throw std::runtime_error("Expected '=' in let statement");
+				Opperator op = ops.back();
+				ops.pop_back();
+				Node *left = astOutput.back();
+				astOutput.pop_back();
+				astOutput.push_back(new Node(op.op, left, nullptr, op.type));
+				inLet = false;
+
+				continue;
 			}
 			while (!ops.empty()) {
 				AddNode(ops.back(), astOutput);
@@ -40,7 +47,7 @@ std::vector<Node*>& Parser::ParseToAst() {
 			expectingOperand = true;
 			continue;
 		}
-		if (token.type == TokenType::Number || token.type == TokenType::True || token.type == TokenType::False || token.type == TokenType::String) {
+		if (token.type == TokenType::Number || token.type == TokenType::True || token.type == TokenType::False || token.type == TokenType::String || token.type == TokenType::Undefined || token.type == TokenType::Null) {
 			astOutput.push_back(new Node(token.text, token.type));
 			expectingOperand = false;
 		} else if (token.type == TokenType::Identifier) {
